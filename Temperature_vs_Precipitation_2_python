@@ -1,0 +1,362 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jul  4 17:45:31 2019
+
+@author: Ifeanyi Okaro
+"""
+
+import numpy as np
+from netCDF4 import Dataset
+import datetime
+import matplotlib.pyplot as plt
+
+
+pc = Dataset('D:/Ify_Bdata/precip.mon.total.v501.nc','r')
+
+#obtaining the variables
+precip  = pc['precip'][:]
+lon = pc['lon'][:]
+lat = pc['lat'][:]
+time = pc['time'][:]
+
+
+import calendar
+
+#define a function to generate dates in months only
+def add_months(sourcedate, months):
+    month = sourcedate.month - 1 + months
+    year = sourcedate.year + month // 12
+    month = month % 12 + 1
+    day = min(sourcedate.day, calendar.monthrange(year,month)[1])
+    return datetime.date(year, month, day)
+
+
+startdate = datetime.date(1900, 1, 1)
+enddate = datetime.date(2017, 12, 1)
+
+i = add_months(startdate,1416)
+
+#create an empty list
+time = []   
+for i in range (1416):
+   dates = add_months(startdate,i)
+   time.append(dates) #append the generated dates
+   print(dates)
+
+############# 
+# find the mean precipitation for all areas
+prep = precip.mean(axis=2).mean(axis=1)
+
+plt.figure()
+plt.title('Monthly total Precipitation time series')
+plt.plot(time, prep)
+
+
+#############
+
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+
+# plot mean precipitation for all yeas across all areas
+pre = precip.mean(axis= 0)
+plt.figure()
+ax = plt.axes(projection=ccrs.PlateCarree())
+
+x,y = np.meshgrid(lat,lon)
+
+b = plt.contourf(lon,lat ,pre, 360,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.gist_ncar)
+ax.coastlines()
+a = plt.colorbar(b, ax = ax)
+a.set_label('Precipitation (cm)', fontweight = 'bold', fontsize = 14)
+for l in a.ax.yaxis.get_ticklabels():
+    l.set_weight('bold')
+plt.show()
+
+
+# breaking down into two    
+pf70 = precip[0 :708, :,:]
+pl70 = precip[708: 1476, :,:]
+
+pf70m = pf70.mean(axis= 0)
+pl70m = pl70.mean(axis= 0)
+    
+f = plt.figure()
+ax = f.add_subplot(421, projection=ccrs.PlateCarree())
+
+x,y = np.meshgrid(lat,lon)
+
+b = plt.contourf(lon,lat ,pl70m, 360,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.gist_ncar)
+ax.coastlines()
+a = plt.colorbar(b, ax = ax)
+a.set_label('Precipitation (cm)', fontweight = 'bold', fontsize = 14)
+for l in a.ax.yaxis.get_ticklabels():
+#    l.set_family("Times New Roman")
+    l.set_weight('bold')
+plt.show()
+
+
+
+plt.figure()
+ax = plt.axes(projection=ccrs.PlateCarree())
+
+x,y = np.meshgrid(lat,lon)
+
+b = plt.contourf(lon,lat ,p_winter, 360,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.gist_ncar)
+ax.coastlines()
+a = plt.colorbar(b, ax = ax)
+a.set_label('Precipitation (cm)', fontweight = 'bold', fontsize = 14)
+for l in a.ax.yaxis.get_ticklabels():
+#    l.set_family("Times New Roman")
+    l.set_weight('bold')
+plt.show()
+
+
+################
+
+#obtaining the summer and winter months
+
+    
+jun = precip[5::12,:,:] 
+juli =  precip[6::12,:,:]
+aug = precip[7::12,:,:]
+
+Dec = precip[11::12,:,:] 
+Jan =  precip[0::12,:,:]
+feb = precip[1::12,:,:]
+
+
+time_jun = time[5::12]
+
+winter = (Dec+ Jan + feb)/3
+summer = (jun + juli + aug)/3
+
+summer_pre = summer.mean(axis=2).mean(axis=1)
+winter_pre = winter.mean(axis=2).mean(axis=1)
+
+summer_pstd = summer.std(axis=2).mean(axis=1)
+winter_pstd = winter.std(axis=2).mean(axis=1)
+
+index = 1
+summer_t = []
+for i in range(precip.shape[0]):
+    if index > 4 and index < 8:
+        summer_t.append(time[index])
+        
+    index = (index%12)+1
+        
+summ_time = np.array(summer_t)
+plt.figure()
+plt.title('Monthly total Precipitation time series')
+#plt.plot(time_jun, winter_temp)
+plt.plot(time_jun,summer_pre, label = 'Precipitation (cm)')
+plt.plot(time_jun, summer_temp, label = 'Temperature')
+
+np.corrcoef(summer_pre, summer_temp)[0, 1]
+
+fig = plt.figure()
+ax1 = fig.add_subplot(2,1,2)
+pp = ax1.plot(time_jun, winter_pre, linewidth = 2, label = 'Precipation')
+ax1.set_ylabel('Precipitation (cm)', color = 'b', fontweight = 'bold', fontsize = 12)
+ax1.set_title('December - February Mean Precipitation VS Temperature ', fontweight = 'bold', fontsize = 14)
+for tl in ax1.get_yticklabels():
+    tl.set_color('b')
+    tl.set_fontweight('bold')
+for tl in ax1.get_xticklabels():
+    tl.set_fontweight('bold')
+
+
+ax2 = ax1.twinx()
+tt = ax2.plot(time_jun, winter_temp, 'r-', linewidth = 2, label = 'Temparature')
+ax2.set_ylabel('Temperature (°C)', color='r', fontweight = 'bold', fontsize = 12)
+for tl in ax2.get_yticklabels():
+    tl.set_color('r')
+    tl.set_fontweight('bold')
+lns = pp + tt
+labs = [l.get_label() for l in lns]
+ax1.legend(lns, labs, loc=0)
+plt.show()
+
+
+
+
+
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+
+# plot mean precipitation for all yeas across all areas
+summer_map = summer.mean(axis= 0)
+winter_map = winter.mean(axis= 0)
+
+summer_mapstd[:].max()
+
+b = plt.contourf(lon,lat ,winter_mapstd,360, vmin = 0, vmax = 18 , 
+             transform=ccrs.PlateCarree(), cmap=plt.cm.gist_ncar )
+
+f = plt.figure()
+ax = f.add_subplot(2,1,2, projection=ccrs.PlateCarree())
+
+x,y = np.meshgrid(lat,lon)
+
+c = plt.contourf(lon,lat ,winter_mapstd,360, vmin = 0, vmax = 18, 
+             transform=ccrs.PlateCarree(), cmap=plt.cm.gist_ncar )
+ax.coastlines()
+a = plt.colorbar(b, ax = ax,fraction=0.046, pad=0.01)
+ax.set_title('December - February Monthly Std Precipitation (1900 - 2017)', fontweight = 'bold', fontsize = 14)
+a.set_label('Precipitation (cm)', fontweight = 'bold', fontsize = 12)
+for l in a.ax.yaxis.get_ticklabels():
+    l.set_weight('bold') 
+plt.show()
+
+gca().set_axis_off()
+subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
+            hspace = 0, wspace = 0)
+margins(0,0)
+gca().xaxis.set_major_locator(NullLocator())
+gca().yaxis.set_major_locator(NullLocator())
+savefig("filename.pdf", bbox_inches = 'tight',
+    pad_inches = 0)
+
+# map plotting
+summer_mean = np.mean(s2_arr, axis = 0)
+plt.figure()
+ax = plt.axes(projection=ccrs.PlateCarree())
+
+x,y = np.meshgrid(lat,lon)
+
+b = plt.contourf(lon,lat ,summer_mean, 360,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.gist_ncar)
+ax.coastlines()
+a = plt.colorbar(b, ax = ax)
+a.set_label('Precipitation (cm)', fontweight = 'bold', fontsize = 14)
+for l in a.ax.yaxis.get_ticklabels():
+#    l.set_family("Times New Roman")
+    l.set_weight('bold')
+plt.show()
+######################
+
+
+
+##########################
+
+pft = pf70.mean(axis=2).mean(axis=1)
+tf70 = time[0:708]
+plt.figure()
+plt.title('Monthly total Precipitation time series')
+plt.plot(tf70, pft)
+
+#last 70
+plat = pl70.mean(axis=2).mean(axis=1)
+tl70 = time[708:1476]
+plt.figure()
+plt.title('Monthly total Precipitation time series')
+plt.plot(tl70, plat)
+
+import pandas as pd
+import statsmodels.api as sm
+def de_season_sm(s):
+    ser = pd.Series(s, index=time)
+    decomp = sm.tsa.seasonal_decompose(ser, model='additive', freq=12) 
+    return decomp.resid
+
+p_ds = de_season_sm(prep)
+
+t_ds = de_season_sm(airt)
+
+plt.figure()
+plt.title('Monthly total Precipitation time series')
+plt.plot(time, p_ds)
+plt.plot(time, t_ds)
+p_f = de_season_sm(pft)
+
+
+def de_season_sm_div(s):
+    ser = pd.Series(s, index=tf70)
+    decomp = sm.tsa.seasonal_decompose(ser, model='additive', freq=12) 
+    return decomp.resid
+
+n_p = de_season_sm_div(pft)
+plt.figure()
+plt.title('Monthly total Precipitation time series')
+plt.plot(tf70, n_p)
+
+import pandas as pd
+ser = pd.Series(prep, index = time)
+from pylab import rcParams
+rcParams['figure.figsize'] = 18, 8
+decomposition = sm.tsa.seasonal_decompose(ser, model='additive')
+fig = decomposition.plot()
+plt.show()
+
+import matplotlib.image as mpimg
+############################
+pic_folder = 'D:/Ify_Bdata/Video/'
+
+picc = precip.shape[0]
+
+
+
+e = plt.contourf(lon,lat ,summer_temp_map, 360,vmin = -70, vmax = 40,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.jet)
+
+b = plt.contourf(lon,lat ,pre, 360,vmin = 0, vmax = 80,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.gist_ncar)
+for t in range(1413,picc): 
+#    summer_mean = temp2.mean(axis = 0)
+    f = plt.figure()
+    ax = f.add_subplot(1,2,1, projection=ccrs.PlateCarree())
+    x,y = np.meshgrid(lat,lon)
+
+    c = plt.contourf(lon,lat ,precip[t , : , :], 360,vmin = 0, vmax = 78,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.gist_ncar)
+    ax.coastlines()
+    a = plt.colorbar(b, ax = ax,fraction=0.026, pad=0.005)
+    ax.set_title(time[t], fontsize = 12, fontweight = 'bold')
+    a.set_label('Precipitation (cm)', fontsize =10, fontweight = 'bold')
+    for l in a.ax.yaxis.get_ticklabels():
+        l.set_weight('bold') 
+        
+   
+    ax2 = f.add_subplot(1,2,2, projection=ccrs.PlateCarree())
+
+    x,y = np.meshgrid(lat,lon)
+
+    ax2.contourf(lon,lat ,air_temp[t, : , :], 360, vmin = -75, vmax = 45,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.jet)
+    ax2.coastlines()
+    d = plt.colorbar(e, ax = ax2,fraction=0.026, pad=0.005)
+    ax2.set_title(time[t],fontweight = 'bold', fontsize = 12)
+    d.set_label('Temperature (°C)', fontsize =10, fontweight = 'bold')
+    for l in d.ax.yaxis.get_ticklabels():
+        l.set_weight('bold')
+#    plt.show()
+    plt.subplots_adjust(right=0.94,\
+                    left=0.06,\
+                    bottom=0.03,\
+                    top=0.97,\
+                    wspace=0.15,\
+                    hspace=0.1)
+    #extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    plt.savefig(pic_folder+'%04d.png' % (t+1),dpi=400)
+    plt.close()
+
+import cv2
+import numpy as np
+import glob
+ 
+img_array = []
+for filename in glob.glob('D:/Ify_Bdata/Video/*.png'):
+    img = cv2.imread(filename)
+    height, width, layers = img.shape
+    size = (width,height)
+    img_array.append(img)
+ 
+ 
+out = cv2.VideoWriter('project.avi',cv2.VideoWriter_fourcc(*'DIVX'), 11, size)
+for i in range(len(img_array)):
+    out.write(img_array[i])
+out.release()
