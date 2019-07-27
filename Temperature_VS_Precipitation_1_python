@@ -1,0 +1,507 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jul  4 17:45:31 2019
+
+@author: Ifeanyi Okaro
+"""
+
+import numpy as np
+from netCDF4 import Dataset
+import datetime
+import scipy
+import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
+from matplotlib import rc, rcParams
+
+
+
+nc = Dataset('D:/Ify_Bdata/air.mon.mean.v501.nc','r')
+#nc = Dataset('D:/Ify_Bdata/air.mon.ltm.v501.nc')
+air_temp  = nc['air'][:]
+lon = nc['lon'][:]
+lat = nc['lat'][:]
+time = nc['time'][:]
+
+nc.variables.keys()
+
+
+######### Defining time ###############
+import calendar
+#define a function to generate dates in months only
+def add_months(sourcedate, months):
+    month = sourcedate.month - 1 + months
+    year = sourcedate.year + month // 12
+    month = month % 12 + 1
+    day = min(sourcedate.day, calendar.monthrange(year,month)[1])
+    return datetime.date(year, month, day)
+startdate = datetime.date(1900, 1, 1)
+enddate = datetime.date(2017, 12, 1)
+i = add_months(startdate,1416)
+#create an empty list
+time = []   
+for i in range (1416):
+   dates = add_months(startdate,i)
+   time.append(dates) #append the generated dates
+   print(dates)
+
+############# Plotting time series ############  
+
+airt = air_temp.mean(axis=2).mean(axis=1)
+airtm = air_temp.mean(axis=0)
+
+
+
+fig = plt.figure()
+ax = fig.add_subplot(2,1,1)
+plt.title('Global mean Terrestial Air Temperatures (1900 t0 2017)', fontweight = 'bold', fontsize = '16')
+plt.plot(time, airt, 'orangered')
+for tick in ax.xaxis.get_ticklabels():
+    tick.set_weight('bold')
+for tick in ax.yaxis.get_ticklabels():
+    tick.set_weight('bold')
+ax.set_xlabel('Time (Years)', fontweight = 'bold', fontsize = '12')
+ax.set_ylabel('Temperature (°C)', fontweight = 'bold', fontsize = '12')
+###################
+
+
+
+ax2 = fig.add_subplot(2,1,2)
+plt.title('Global mean monthly precipitation (1900 t0 2017)', fontweight = 'bold', fontsize = '16')
+plt.plot(time, prep, 'mediumblue')
+for tick in ax2.xaxis.get_ticklabels():
+    tick.set_weight('bold')
+for tick in ax2.yaxis.get_ticklabels():
+    tick.set_weight('bold')
+ax2.set_xlabel('Time (Years)', fontweight = 'bold', fontsize = '12')
+ax2.set_ylabel('Precipitation (cm)', fontweight = 'bold', fontsize = '12')
+
+
+############# Summer and Winter indexing ###############
+
+# Creating Yearly Mean <data
+mar_t = air_temp[3::12,:,:] 
+apr_t =  air_temp[5::12,:,:]
+may_t = air_temp[4::12,:,:]
+
+jun_t = air_temp[5::12,:,:] 
+juli_t =  air_temp[6::12,:,:]
+aug_t = air_temp[7::12,:,:]
+
+sep_t = air_temp[5::12,:,:] 
+oct_t =  air_temp[6::12,:,:]
+nov_t = air_temp[7::12,:,:]
+
+Dec_t = air_temp[11::12,:,:] 
+Jan_t =  air_temp[0::12,:,:]
+feb_t = air_temp[1::12,:,:]
+
+
+Yearly_temp = (mar_t + apr_t + may_t + jun_t + juli_t +  aug_t /\
+               + sep_t + oct_t + nov_t + Dec_t + Jan_t + feb_t)/12
+
+time_jun = time[5::12]
+
+
+yrt_p = Yearly_temp.mean(axis=2).mean(axis=1)
+plt.figure()
+plt.plot(time_jun, yrt_p)
+
+winter_t = (Dec_t+ Jan_t + feb_t)/3
+summer_t = (jun_t + juli_t + aug_t)/3
+
+
+summer_pre = summer.mean(axis=2).mean(axis=1)
+winter_pre = winter.mean(axis=2).mean(axis=1)
+
+summer_temp = summer_t.mean(axis=2).mean(axis=1)
+winter_temp = winter_t.mean(axis=2).mean(axis=1)
+
+## Filtering####
+
+
+def savitzky_golay(y, window_size, order, deriv=0, rate=1):
+    """
+    Takes input of series, window_size, order, deriv, and rate
+    DEFAULT: savitzky_golay(values, 21, 1, deriv=0, rate=1)
+    window_size must be ODD
+    """
+    from math import factorial
+    import numpy as np
+    try:
+        window_size = np.abs(np.int(window_size))
+        order = np.abs(np.int(order))
+    except ValueError:
+        raise ValueError("window_size and order have to be of type int")
+    if window_size % 2 != 1 or window_size < 1:
+        raise TypeError("window_size size must be a positive odd number")
+    if window_size < order + 2:
+        raise TypeError("window_size is too small for the polynomials order")
+    order_range = range(order+1)
+    half_window = (window_size -1) // 2
+    # precompute coefficients
+    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
+    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
+    # pad the signal at the extremes with
+    # values taken from the signal itself
+    firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
+    lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
+    y = np.concatenate((firstvals, y, lastvals))
+    return np.convolve( m[::-1], y, mode='valid')
+
+
+
+summer_tempf = savitzky_golay(summer_temp, 5, 2, deriv=0, rate=1)
+winter_tempf = savitzky_golay(winter_temp, 5, 2, deriv=0, rate=1)
+
+summer_pref = savitzky_golay(summer_pre, 5, 2, deriv=0, rate=1)
+winter_pref = savitzky_golay(winter_pre, 5, 2, deriv=0, rate=1)
+
+pref_mean = savitzky_golay(pref_mean, 5, 2, deriv=0, rate=1)
+prel_mean = savitzky_golay(prel_mean, 5, 2, deriv=0, rate=1)
+
+tempf_mean = savitzky_golay(tempf_mean, 5, 2, deriv=0, rate=1)
+templ_mean = savitzky_golay(templ_mean, 5, 2, deriv=0, rate=1)
+
+
+
+fig = plt.figure()
+ax1 = fig.add_subplot(2,1,1)
+pp = ax1.plot(time_first70, pref_mean, linewidth = 2, label = 'Precipation')
+ax1.set_ylabel('Precipitation (cm)', color = 'b', fontweight = 'bold', fontsize = 12)
+ax1.set_title('June - August Mean Monthly Total Temperature VS Precipitation (1900 - 1958) ', fontweight = 'bold', fontsize = 16)
+ax1.set_xlabel('Time (Years)', fontweight = 'bold', fontsize = 12)
+for tl in ax1.get_yticklabels():
+    tl.set_color('b')
+    tl.set_fontweight('bold')
+for tl in ax1.get_xticklabels():
+    tl.set_fontweight('bold')
+
+
+ax2 = ax1.twinx()
+tt = ax2.plot(time_first70, tempf_mean, 'r-', linewidth = 2, label = 'Temparature')
+ax2.set_ylabel('Temperature (°C)', color='r', fontweight = 'bold', fontsize = 12)
+
+for tl in ax2.get_yticklabels():
+    tl.set_color('r')
+    tl.set_fontweight('bold')
+lns = pp + tt
+labs = [l.get_label() for l in lns]
+leg = ax1.legend(lns, labs, loc= 'upper right')
+leg.get_frame().set_linewidth(0.0)
+plt.show()
+
+
+import pylab
+x = st
+y = SH
+
+pylab.plot(x,y,'o', label = 'Data Points', color = 'b')
+
+# calc the trendline
+z = numpy.polyfit(x, y, 6)
+p = numpy.poly1d(z)
+pylab.plot(x,p(x),"r--", linewidth = 3, label = 'trend line')
+# the line equation:
+plt.legend(loc = 'upper left')
+print("y=%.6fx+(%.6f)"%(z[0],z[1])
+
+
+plt.figure()
+plt.scatter(time_last70, prel_mean)
+np.cov(pref_mean, tempf_mean)
+
+
+fig = plt.figure()
+ax1 = fig.add_subplot(1,1,1)
+pp = ax1.scatter(prel_mean, tempf_mean, linewidth = 2, label = 'Precipation')
+ax1.set_ylabel('Precipitation (cm)', color = 'b', fontweight = 'bold', fontsize = 12)
+ax1.set_title('June - August Mean Monthly Total Temperature VS Precipitation (1900 - 1958) ', fontweight = 'bold', fontsize = 16)
+ax1.set_xlabel('Time (Years)', fontweight = 'bold', fontsize = 12)
+for tl in ax1.get_yticklabels():
+    tl.set_color('b')
+    tl.set_fontweight('bold')
+for tl in ax1.get_xticklabels():
+    tl.set_fontweight('bold')
+
+
+
+
+################################
+summer_temp_map = summer_t.mean(axis=0)
+winter_temp_map = winter_t.mean(axis=0)
+
+
+##India slicing
+lonind = nc['lon'][134:314]
+latind = nc['lat'][108:212]
+
+
+indiat = summer_temp_map[108:212, 134:314]
+indiawtt = winter_temp_map[108:212, 134:314]
+
+
+summer_tempstd = summer_t.std(axis=0)
+winter_tempstd = winter_t.std(axis=0)
+
+india = summer_map[108:212, 134:314]
+indiawt = winter_map[108:212, 134:314]
+winter_t[:].max()
+
+
+import scipy.stats as st
+st.spearmanr(india,indiat)
+
+
+# india correlation
+fig = plt.figure()
+ax1 = fig.add_subplot(1,1,1)
+#pp = ax1.plot(st, NH, label = 'Northern Hemisphere')
+pc = ax1.scatter(india,indiat , label = 'Data points')
+ax1.set_ylabel('Temperature (°C)', fontweight = 'bold', fontsize = 14)
+ax1.set_xlabel('Precipitation(cm)', fontweight = 'bold', fontsize = 14)
+ax1.set_title('June - August Temperature vs Precipitation India (1959 - 2017) ', fontweight = 'bold', fontsize = 16)
+for tl in ax1.get_yticklabels():
+    tl.set_fontweight('bold')
+for tl in ax1.get_xticklabels():
+    tl.set_fontweight('bold')
+
+#
+#plt.figure
+import pylab
+x = indiawt
+y = indiawtt
+
+#pylab.plot(x,y,'o', label = 'Data Points', color = 'b')
+
+# calc the trendline
+z = numpy.polyfit(x, y, 6)
+p = numpy.poly1d(z)
+pylab.plot(x,p(x),"r--", linewidth = 3, label = 'trend line')
+# the line equation:
+plt.legend(loc = 'upper right')
+print("y=%.6fx+(%.6f)"%(z[0],z[1]))
+from cartopy import config
+import cartopy.crs as ccrs
+
+b = plt.contourf(lonind,latind ,indiawt,360, vmin = 0, vmax = 78,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.gist_ncar )
+
+f = plt.figure()
+
+ax = f.add_subplot(2,2,3, projection=ccrs.PlateCarree())
+x,y = np.meshgrid(latind,lonind)
+
+e = plt.contourf(lonind,latind ,indiawt,360, vmin = -4, vmax = 35,
+             transform = ccrs.PlateCarree(), cmap=plt.cm.jet)
+ax.coastlines()
+a = plt.colorbar(c, ax = ax,fraction=0.046, pad=0.01)
+ax.set_title('December - February Mean Temperature India (1900 - 2017)', fontweight = 'bold', fontsize = 14)
+a.set_label('Temperature (°C)', fontweight = 'bold', fontsize = 12)
+for l in a.ax.yaxis.get_ticklabels():
+    l.set_weight('bold')  
+
+plt.show()
+###################
+
+
+ax2 = fig.add_subplot(1,1,1)
+plt.title('Global mean monthly precipitation (1900 t0 2017)', fontweight = 'bold', fontsize = '16')
+plt.plot(time_jun, summer_temp)
+for tick in ax2.xaxis.get_ticklabels():
+    tick.set_weight('bold')
+for tick in ax2.yaxis.get_ticklabels():
+    tick.set_weight('bold')
+ax2.set_xlabel('Time (Years)', fontweight = 'bold', fontsize = '12')
+ax2.set_ylabel('Precipitation (cm)', fontweight = 'bold', fontsize = '12')
+
+
+
+
+from cartopy import config
+import cartopy.crs as ccrs
+
+airm = air_temp.mean(axis = 0)
+plt.figure()
+ax = plt.axes(projection=ccrs.PlateCarree())
+
+x,y = np.meshgrid(lat,lon)
+
+b = plt.contourf(lon,lat ,airm, 360,
+             transform=ccrs.PlateCarree(), cmap=plt.cm.jet)
+ax.coastlines()
+a = plt.colorbar(b, ax = ax)
+a.set_label(' Terrestial Air Temperature (°C)', fontweight = 'bold', fontsize = 14)
+for l in a.ax.yaxis.get_ticklabels():
+#    l.set_family("Times New Roman")
+    l.set_weight('bold')
+plt.show()
+
+#######################
+
+# Dividing the time series
+temp_first70 = summer_t[0:59,:,:] 
+temp_last70 = summer_t[59:118,:,:] 
+
+pre_first70 = summer[0:59,:,:] 
+pre_last70 = summer[59:118,:,:] 
+
+time_first70 = time_jun[0:59] 
+time_last70 = time_jun[59:118]
+
+pref_mean = pre_first70.mean(axis=2).mean(axis=1)
+prel_mean = pre_last70.mean(axis=2).mean(axis=1) 
+
+tempf_mean = temp_first70.mean(axis=2).mean(axis=1)
+templ_mean = temp_last70.mean(axis=2).mean(axis=1)
+
+
+fig = plt.figure()
+ax1 = fig.add_subplot(1,1,1)
+pp = ax1.plot(time_last70, prel_mean, linewidth = 2, label = 'Precipation')
+ax1.set_ylabel('Precipitation (cm)', color = 'b', fontweight = 'bold', fontsize = 12)
+ax1.set_title('June - August Mean Precipitation VS Temperature (1959 - 2018) ', fontweight = 'bold', fontsize = 14)
+for tl in ax1.get_yticklabels():
+    tl.set_color('b')
+    tl.set_fontweight('bold')
+for tl in ax1.get_xticklabels():
+    tl.set_fontweight('bold')
+
+
+ax2 = ax1.twinx()
+tt = ax2.plot(time_last70, templ_mean, 'r-', linewidth = 2, label = 'Temparature')
+ax2.set_ylabel('Temperature (°C)', color='r', fontweight = 'bold', fontsize = 12)
+for tl in ax2.get_yticklabels():
+    tl.set_color('r')
+    tl.set_fontweight('bold')
+lns = pp + tt
+labs = [l.get_label() for l in lns]
+ax1.legend(lns, labs, loc=0)
+plt.show()
+
+plt.figure()
+plt.scatter(time_last70, prel_mean)
+np.cov(pref_mean, tempf_mean)
+
+import scipy.stats as st
+
+st.spearmanr(preN,tempN)
+
+#slicing Nothern and Southern hemisphere
+pre_North = pre_last70[:,0:180,:]
+temp_North = temp_last70[:,0:180,:]
+
+
+tempN = temp_North.mean(axis=2).mean(axis=1)
+preN = pre_North.mean(axis=2).mean(axis=1)
+plt.figure()
+plt.scatter(tempN,preN)
+plt.figure()
+plt.plot(time_last70, preN)
+
+
+
+st = np.arange(1959,2018)
+fig = plt.figure()
+ax1 = fig.add_subplot(2,2,4)
+pp = ax1.scatter(prel_mean, templ_mean, label = 'Data points')
+ax1.set_ylabel('Temperature (°C)', fontweight = 'bold', fontsize = 12)
+ax1.set_xlabel('Years', fontweight = 'bold', fontsize = 12)
+ax1.set_title('June - August Mean Temperature vs Precipitation (1959 - 2017) ', fontweight = 'bold', fontsize = 14)
+for tl in ax1.get_yticklabels():
+    tl.set_fontweight('bold')
+for tl in ax1.get_xticklabels():
+    tl.set_fontweight('bold')
+
+
+#plt.figure
+import pylab
+x = st
+y = prel_mean
+
+pylab.plot(x,y,'o')
+
+# calc the trendline
+z = numpy.polyfit(x, y, 1)
+p = numpy.poly1d(z)
+pylab.plot(x,p(x),"r--", linewidth = 2, label = 'trend line')
+# the line equation:
+plt.legend(loc = 'upper right')
+print("y=%.6fx+(%.6f)"%(z[0],z[1]))
+
+##############
+Yearly_temp.shape
+NHyt = Yearly_temp[:,0:180,:]
+SHyt = Yearly_temp[:,180:360,:]
+
+NH = NHyt.mean(axis=2).mean(axis=1)
+SH = SHyt.mean(axis=2).mean(axis=1)
+
+st = np.arange(1900,2018)
+fig = plt.figure()
+ax1 = fig.add_subplot(2,1,2)
+#pp = ax1.plot(st, NH, label = 'Northern Hemisphere')
+pc = ax1.plot(st, SH, label = 'Data line')
+ax1.set_ylabel('Temperature (°C)', fontweight = 'bold', fontsize = 14)
+ax1.set_xlabel('Years', fontweight = 'bold', fontsize = 14)
+ax1.set_title('Southern Hemisphere Yearly Mean Temperature (1900 - 2017) ', fontweight = 'bold', fontsize = 16)
+for tl in ax1.get_yticklabels():
+    tl.set_fontweight('bold')
+for tl in ax1.get_xticklabels():
+    tl.set_fontweight('bold')
+
+#
+#plt.figure
+import pylab
+x = st
+y = SH
+
+pylab.plot(x,y,'o', label = 'Data Points', color = 'b')
+
+# calc the trendline
+z = numpy.polyfit(x, y, 1)
+p = numpy.poly1d(z)
+pylab.plot(x,p(x),"r--", linewidth = 3, label = 'trend line')
+# the line equation:
+plt.legend(loc = 'upper left')
+print("y=%.6fx+(%.6f)"%(z[0],z[1]))
+
+
+
+
+
+### filtering the data
+def savitzky_golay(y, window_size, order, deriv=0, rate=1):
+    """
+    Takes input of series, window_size, order, deriv, and rate
+    DEFAULT: savitzky_golay(values, 21, 1, deriv=0, rate=1)
+    window_size must be ODD
+    """
+    from math import factorial
+    import numpy as np
+    try:
+        window_size = np.abs(np.int(window_size))
+        order = np.abs(np.int(order))
+    except ValueError:
+        raise ValueError("window_size and order have to be of type int")
+    if window_size % 2 != 1 or window_size < 1:
+        raise TypeError("window_size size must be a positive odd number")
+    if window_size < order + 2:
+        raise TypeError("window_size is too small for the polynomials order")
+    order_range = range(order+1)
+    half_window = (window_size -1) // 2
+    # precompute coefficients
+    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
+    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
+    # pad the signal at the extremes with
+    # values taken from the signal itself
+    firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
+    lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
+    y = np.concatenate((firstvals, y, lastvals))
+    return np.convolve( m[::-1], y, mode='valid')
+
+
+
+prep_filt = savitzky_golay(summer_temp, 5, 2, deriv=0, rate=1)
+plt.figure()
+plt.plot(time_jun,summer_temp)
+plt.plot(time_jun ,prep_filt)
